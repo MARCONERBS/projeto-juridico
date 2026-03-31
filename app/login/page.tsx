@@ -239,7 +239,8 @@ export default function LoginPage() {
           display: none;
           flex-direction: column;
           justify-content: space-between;
-          padding: 3rem;
+          align-items: center;
+          padding: 3rem 4rem;
           flex: 1;
           border-right: 1px solid rgba(34, 197, 94, 0.12);
           background: linear-gradient(135deg, rgba(0,0,0,0.6) 0%, rgba(5, 46, 22, 0.3) 100%);
@@ -249,7 +250,7 @@ export default function LoginPage() {
           .login-left { display: flex; }
         }
 
-        .brand-content { display: flex; flex-direction: column; gap: 1.5rem; margin-top: 2rem; }
+        .brand-content { display: flex; flex-direction: column; gap: 1.5rem; margin-top: 2rem; max-width: 480px; width: 100%; }
 
         .logo-wrapper {
           display: flex;
@@ -298,36 +299,53 @@ export default function LoginPage() {
         .brand-footer {
           font-size: 0.75rem;
           color: rgba(134, 239, 172, 0.5);
+          width: 100%;
+          max-width: 480px;
         }
 
         /* ===== RIGHT PANEL ===== */
         .login-right {
           flex: 1;
           display: flex;
-          align-items: center;
+          align-items: stretch;
           justify-content: center;
-          padding: 2rem 1.5rem;
+          padding: 0;
         }
         @media (min-width: 1024px) {
-          .login-right { flex: 0 0 480px; }
+          .login-right {
+            flex: 0 0 480px;
+            align-items: center;
+            padding: 2rem 1.5rem;
+          }
         }
 
         /* ===== CARD ===== */
         .login-card {
           width: 100%;
-          max-width: 420px;
-          background: rgba(255, 255, 255, 0.04);
-          border: 1px solid rgba(34, 197, 94, 0.15);
-          border-radius: 1.5rem;
-          padding: 2.5rem;
+          background: rgba(2, 20, 8, 0.97);
+          border: none;
+          border-radius: 0;
+          padding: 3rem 2rem 2.5rem;
           backdrop-filter: blur(20px);
-          box-shadow:
-            0 0 0 1px rgba(34, 197, 94, 0.05),
-            0 32px 64px rgba(0, 0, 0, 0.5),
-            0 0 80px rgba(34, 197, 94, 0.06);
           display: flex;
           flex-direction: column;
           gap: 1.75rem;
+          justify-content: center;
+          min-height: 100vh;
+        }
+        @media (min-width: 1024px) {
+          .login-card {
+            min-height: unset;
+            max-width: 420px;
+            border: 1px solid rgba(34, 197, 94, 0.15);
+            border-radius: 1.5rem;
+            padding: 2.5rem;
+            background: rgba(255, 255, 255, 0.04);
+            box-shadow:
+              0 0 0 1px rgba(34, 197, 94, 0.05),
+              0 32px 64px rgba(0, 0, 0, 0.5),
+              0 0 80px rgba(34, 197, 94, 0.06);
+          }
         }
 
         /* Mobile logo */
