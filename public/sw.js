@@ -8,7 +8,7 @@ self.addEventListener("activate", (e) => {
   return self.clients.claim();
 });
 
-self.addEventListener("fetch", (e) => {
-  // Pass-through fetch (no caching for dynamic NextJS app atm)
-  e.respondWith(fetch(e.request));
-});
+// self.addEventListener("fetch", (e) => {
+//   // Pass-through fetch (no caching for dynamic NextJS app atm)
+//   e.respondWith(fetch(e.request));
+// });

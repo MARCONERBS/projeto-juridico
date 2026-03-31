@@ -74,8 +74,13 @@ export function UploadZone({ onExtractionComplete }: UploadZoneProps) {
       setStatus("success");
       onExtractionComplete(data);
     } catch (err: any) {
+      console.error("Erro completo do fetch:", err);
+      const errorMsg = err.name === 'TypeError' && err.message === 'Failed to fetch' 
+        ? "Erro de Rede: Não foi possível conectar ao servidor. Verifique se o Service Worker foi desativado ou se há bloqueio de firewall (CORS)."
+        : `Erro ao processar arquivo: ${err.message || "Erro desconhecido"}`;
+      
       setStatus("error");
-      setError(err.message || "Erro ao processar arquivo");
+      setError(errorMsg);
     }
   };
 
