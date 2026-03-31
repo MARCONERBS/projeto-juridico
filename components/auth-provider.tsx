@@ -157,10 +157,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [loading, user, profile, pathname, router]);
 
-  if (loading && pathname !== "/login") {
+  // Bloqueia a renderização do conteúdo (DashboardShell + Páginas) 
+  // enquanto não tivermos certeza do estado da sessão
+  if (loading || (!user && pathname !== "/login")) {
     return (
       <div className="flex h-screen items-center justify-center bg-black">
-        <span className="text-white animate-pulse">Carregando CORE...</span>
+        <div className="flex flex-col items-center gap-4">
+           <span className="text-emerald-500 animate-pulse text-lg font-bold tracking-widest">
+             CORE
+           </span>
+           <span className="text-zinc-500 text-xs animate-pulse">
+             Verificando acesso...
+           </span>
+        </div>
       </div>
     );
   }
