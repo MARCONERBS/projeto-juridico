@@ -29,8 +29,17 @@ const AuthContext = createContext<AuthContextType>({
 
 export const useAuth = () => useContext(AuthContext);
 
-// Rotas exclusivas de admin
 const ADMIN_ONLY_ROUTES = ["/", "/team", "/settings"];
+
+/**
+ * Obtém o role do usuário a partir do JWT (app_metadata).
+ * Essa abordagem é imediata (sem DB call) e funciona no refresh.
+ * Fallback para "user" se o campo não estiver presente.
+ */
+function getRoleFromSession(session: Session): "admin" | "user" {
+  const role = session.user?.app_metadata?.role;
+  return role === "admin" ? "admin" : "user";
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -44,85 +53,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     isMounted.current = true;
 
-    // Fallback de segurança: 8s
+    // Fallback de segurança: 6s
     const fallback = setTimeout(() => {
       if (isMounted.current) {
         console.warn("Auth: fallback acionado");
         setLoading(false);
       }
-    }, 8000);
+    }, 6000);
 
-    /**
-     * Usamos APENAS onAuthStateChange como fonte de verdade.
-     * O evento INITIAL_SESSION é disparado imediatamente na montagem
-     * com a sessão já existente no localStorage — sem precisar chamar
-     * getSession() separadamente (que causava race condition).
-     */
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      (event, session) => {
         if (!isMounted.current) return;
 
         setSessionData(session);
         setUser(session?.user ?? null);
 
         if (session?.user) {
-          // Busca o perfil do banco
-          try {
-            const { data, error } = await supabase
-              .from("profiles")
-              .select("id, email, role")
-              .eq("id", session.user.id)
-              .single();
+          // Lê o role DIRETAMENTE do JWT - sem DB call, sem race condition
+          const role = getRoleFromSession(session);
+          const currentProfile: Profile = {
+            id: session.user.id,
+            email: session.user.email ?? "",
+            role,
+          };
+          setProfile(currentProfile);
+          setLoading(false);
 
-            if (!isMounted.current) return;
-
-            let resolvedProfile: Profile;
-
-            if (error && error.code === "PGRST116") {
-              // Novo usuário: cria com role "user"
-              const newProfile: Profile = {
-                id: session.user.id,
-                email: session.user.email!,
-                role: "user",
-              };
-              await supabase.from("profiles").insert([newProfile]);
-              resolvedProfile = newProfile;
-            } else if (data) {
-              resolvedProfile = data as Profile;
-            } else {
-              // Erro inesperado: trata como user por segurança
-              console.error("Auth: erro ao carregar profile", error);
-              resolvedProfile = {
-                id: session.user.id,
-                email: session.user.email!,
-                role: "user",
-              };
+          // Redireciona apenas no evento de login (não no refresh)
+          if (event === "SIGNED_IN") {
+            const currentPath = window.location.pathname;
+            if (currentPath === "/login") {
+              router.replace(role === "admin" ? "/" : "/upload");
             }
-
-            if (!isMounted.current) return;
-
-            setProfile(resolvedProfile);
-
-            // Redireciona por role APENAS na tela de login
-            // (no refresh, o usuário já está na rota certa — não mover)
-            if (event === "SIGNED_IN" && window.location.pathname === "/login") {
-              if (resolvedProfile.role === "admin") {
-                router.replace("/");
-              } else {
-                router.replace("/upload");
-              }
-            }
-          } catch (err) {
-            console.error("Auth: exceção ao buscar profile", err);
-            if (isMounted.current) setProfile(null);
-          } finally {
-            if (isMounted.current) setLoading(false);
           }
         } else {
-          // Sem sessão: limpa e volta ao login
+          // Sem sessão
           setProfile(null);
           setLoading(false);
-          if (event !== "INITIAL_SESSION") {
+
+          // Redireciona para login apenas em eventos explícitos (não INITIAL_SESSION com null)
+          if (event === "SIGNED_OUT") {
             router.push("/login");
           }
         }
@@ -141,14 +111,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (loading) return;
 
-    // Não logado em rota privada
+    // Não logado em rota privada → login
     if (!user && pathname !== "/login") {
       router.replace("/login");
       return;
     }
 
-    // Usuário comum em rota de admin
-    if (user && profile && profile.role !== "admin" && ADMIN_ONLY_ROUTES.includes(pathname)) {
+    // Admin em /login → painel admin
+    if (user && profile?.role === "admin" && pathname === "/login") {
+      router.replace("/");
+      return;
+    }
+
+    // Usuário comum em /login → /upload
+    if (user && profile?.role === "user" && pathname === "/login") {
+      router.replace("/upload");
+      return;
+    }
+
+    // Usuário comum em rota de admin → /upload
+    if (user && profile?.role !== "admin" && ADMIN_ONLY_ROUTES.includes(pathname)) {
       router.replace("/upload");
       return;
     }
