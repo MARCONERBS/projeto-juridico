@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
+import { Upload, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/components/auth-provider";
 
