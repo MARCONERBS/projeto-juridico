@@ -1,13 +1,8 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { Upload, FileText, CheckCircle2, AlertCircle, Loader2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/components/auth-provider";
-import * as pdfjsLib from "pdfjs-dist";
-
-// Configuração do Worker do PDF.js para rodar no navegador usando CDN compatível com a versão instalada
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
 
 interface UploadZoneProps {
   onExtractionComplete: (data: any) => void;
@@ -69,6 +64,9 @@ export function UploadZone({ onExtractionComplete }: UploadZoneProps) {
       let extractedText = "";
       if (file.type === "application/pdf") {
         try {
+          const pdfjsLib = await import("pdfjs-dist");
+          pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
+          
           const arrayBuffer = await file.arrayBuffer();
           const loadingTask = pdfjsLib.getDocument({
             data: arrayBuffer,

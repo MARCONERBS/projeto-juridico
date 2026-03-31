@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { User, Session } from "@supabase/supabase-js";
@@ -37,43 +37,74 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
 
+  // Evita setar estado após desmonte
+  const isMounted = useRef(true);
+  const hasResolved = useRef(false);
+
+  const resolveLoading = () => {
+    if (!hasResolved.current && isMounted.current) {
+      hasResolved.current = true;
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    // Busca a sessão inicial
-    supabase.auth.getSession().then(({ data: { session } }: { data: { session: Session | null } }) => {
-      setSessionData(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchProfile(session.user.id, session.user.email!);
-      } else {
-        setLoading(false);
+    isMounted.current = true;
+    hasResolved.current = false;
+
+    // Fallback: se em 5 segundos nada resolver, libera a tela
+    const fallbackTimer = setTimeout(() => {
+      if (isMounted.current && !hasResolved.current) {
+        console.warn("Auth: timeout de fallback acionado.");
+        resolveLoading();
       }
-    });
+    }, 5000);
+
+    // Busca a sessão inicial
+    supabase.auth
+      .getSession()
+      .then(({ data: { session } }: { data: { session: Session | null } }) => {
+        if (!isMounted.current) return;
+        setSessionData(session);
+        setUser(session?.user ?? null);
+        if (session?.user) {
+          fetchProfile(session.user.id, session.user.email!);
+        } else {
+          resolveLoading();
+        }
+      })
+      .catch((err) => {
+        console.error("Auth: erro ao buscar sessão:", err);
+        resolveLoading();
+      });
 
     // Escuta mudanças de auth
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(
       async (event: string, session: Session | null) => {
+        if (!isMounted.current) return;
         setSessionData(session);
         setUser(session?.user ?? null);
         if (session?.user) {
           await fetchProfile(session.user.id, session.user.email!);
         } else {
           setProfile(null);
-          setLoading(false);
-          router.push("/login"); // Força o login ao deslogar
+          resolveLoading();
+          if (pathname !== "/login") {
+            router.push("/login");
+          }
         }
       }
     );
 
-    // Segurança: se em 3 segundos não carregar a sessão, libera a tela
-    const timeout = setTimeout(() => {
-      setLoading(false);
-    }, 3000);
-
     return () => {
+      isMounted.current = false;
+      clearTimeout(fallbackTimer);
       subscription.unsubscribe();
-      clearTimeout(timeout);
     };
-  }, [router]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const fetchProfile = async (userId: string, email: string) => {
     try {
@@ -83,17 +114,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .eq("id", userId)
         .single();
 
+      if (!isMounted.current) return;
+
       if (error && error.code === "PGRST116") {
         const newProfile = { id: userId, email, role: "user" };
         await (supabase as any).from("profiles").insert([newProfile]);
-        setProfile(newProfile as Profile);
+        if (isMounted.current) setProfile(newProfile as Profile);
       } else {
-        setProfile(data ? (data as unknown as Profile) : null);
+        if (isMounted.current)
+          setProfile(data ? (data as unknown as Profile) : null);
       }
     } catch (err) {
       console.error("Erro ao carregar perfil:", err);
     } finally {
-      setLoading(false);
+      resolveLoading();
     }
   };
 
@@ -106,7 +140,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!loading && !user && pathname !== "/login") {
       router.replace("/login");
     }
-    // Se logado e em login, manda pro inicio
     if (!loading && user && pathname === "/login") {
       router.replace("/");
     }
@@ -114,11 +147,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Enquanto carrega a primeira vez, não renderizar o APP se for rota privada
   if (loading && pathname !== "/login") {
-    return <div className="flex h-screen items-center justify-center bg-black"><span className="text-white animate-pulse">Carregando CORE...</span></div>;
+    return (
+      <div className="flex h-screen items-center justify-center bg-black">
+        <span className="text-white animate-pulse">Carregando CORE...</span>
+      </div>
+    );
   }
 
   return (
-    <AuthContext.Provider value={{ user, profile, session: sessionData, loading, logout }}>
+    <AuthContext.Provider
+      value={{ user, profile, session: sessionData, loading, logout }}
+    >
       {children}
     </AuthContext.Provider>
   );
