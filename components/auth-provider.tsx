@@ -64,8 +64,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     );
 
+    // Segurança: se em 3 segundos não carregar a sessão, libera a tela
+    const timeout = setTimeout(() => {
+      setLoading(false);
+    }, 3000);
+
     return () => {
       subscription.unsubscribe();
+      clearTimeout(timeout);
     };
   }, [router]);
 

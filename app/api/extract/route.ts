@@ -34,14 +34,18 @@ export async function POST(req: NextRequest) {
     const buffer = Buffer.from(arrayBuffer);
     const fileName = file.name;
     const fileType = file.type;
+    
+    // Texto pré-extraído pelo navegador (mais rápido e seguro no Vercel)
+    let extractedText = (formData.get("extractedText") as string) || "";
 
     // Processamento Assíncrono para rodar por trás
     const backgroundTask = async () => {
       try {
-        let extractedText = "";
-        let pageCount = null;
-
-        if (fileType === "application/pdf" || fileName.endsWith(".pdf")) {
+        let pageCount = parseInt(formData.get("pageCount") as string) || null;
+        
+        // Se o texto não veio pronto, tentamos extrair no servidor (fallback)
+        if (!extractedText) {
+          if (fileType === "application/pdf" || fileName.endsWith(".pdf")) {
           // @ts-ignore
           const workerModule = await import("pdfjs-dist/legacy/build/pdf.worker.mjs");
           (globalThis as any).pdfjsWorker = workerModule;
@@ -90,7 +94,8 @@ export async function POST(req: NextRequest) {
                console.log("PDF escaneado, mas nenhuma chave configurada.");
             }
           }
-        } else {
+          }
+        } else if (!extractedText) {
           extractedText = buffer.toString("utf-8");
         }
 

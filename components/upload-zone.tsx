@@ -4,6 +4,10 @@ import { useState, useRef } from "react";
 import { Upload, FileText, CheckCircle2, AlertCircle, Loader2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/components/auth-provider";
+import * as pdfjsLib from "pdfjs-dist";
+
+// Configuração do Worker do PDF.js para rodar no navegador usando CDN compatível com a versão instalada
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
 
 interface UploadZoneProps {
   onExtractionComplete: (data: any) => void;
@@ -61,6 +65,37 @@ export function UploadZone({ onExtractionComplete }: UploadZoneProps) {
     }
 
     try {
+      // 1. Tentar extração local no navegador (Muito mais rápido e evita timeout do servidor)
+      let extractedText = "";
+      if (file.type === "application/pdf") {
+        try {
+          const arrayBuffer = await file.arrayBuffer();
+          const loadingTask = pdfjsLib.getDocument({
+            data: arrayBuffer,
+            useSystemFonts: true,
+            disableFontFace: true,
+          });
+          const pdf = await loadingTask.promise;
+          let fullText = "";
+          for (let i = 1; i <= pdf.numPages; i++) {
+            const page = await pdf.getPage(i);
+            const content = await page.getTextContent();
+            const pageText = content.items
+              .map((item: any) => item.str)
+              .join(" ");
+            fullText += pageText + "\n";
+          }
+          extractedText = fullText.trim();
+          if (extractedText) {
+            formData.append("extractedText", extractedText);
+            formData.append("pageCount", pdf.numPages.toString());
+          }
+        } catch (pdfErr) {
+          console.warn("Falha na extração local, o servidor tentará via IA:", pdfErr);
+        }
+      }
+
+      // 2. Enviar para a API
       const response = await fetch("/api/extract", {
         method: "POST",
         body: formData,
