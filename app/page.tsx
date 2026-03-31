@@ -1,25 +1,21 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
+import { useState } from "react";
 import { 
   FileText, 
   History, 
-  Zap,
-  Copy,
   CheckCircle,
   Clock,
-  Download,
   User
 } from "lucide-react";
 import { StatsCard } from "@/components/stats-card";
-import { UploadZone } from "@/components/upload-zone";
+
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/components/auth-provider";
 
 export default function Home() {
   const { profile } = useAuth();
-  const [extractedData, setExtractedData] = useState<any>(null);
-  const [copied, setCopied] = useState(false);
   const [history, setHistory] = useState<any[]>([]);
 
   useEffect(() => {
@@ -35,13 +31,6 @@ export default function Home() {
     loadDashboard();
   }, []);
 
-  const copyToClipboard = () => {
-    if (extractedData?.text) {
-      navigator.clipboard.writeText(extractedData.text);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
-  };
 
   return (
     <div className="space-y-8 pb-12">
@@ -75,74 +64,7 @@ export default function Home() {
         />
       </div>
 
-      <div className="grid gap-8 lg:grid-cols-1">
-        <div className="space-y-4">
-          <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50">
-            Fazer Nova Extração
-          </h2>
-          <UploadZone onExtractionComplete={(data) => {
-            setExtractedData(data);
-            // Atualizar o histórico ao enviar novo arquivo
-            if (data?.id) {
-               setHistory(prev => [{
-                  id: data.id,
-                  filename: data.filename,
-                  created_at: new Date().toISOString(),
-                  data_json: { numpages: data.numpages, text: data.text }
-               }, ...prev].slice(0, 5));
-            }
-          }} />
-        </div>
 
-        {extractedData && (
-          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <div className="flex items-center justify-between gap-4 rounded-t-2xl border border-b-0 border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-black">
-              <div className="flex items-center gap-3">
-                <FileText className="h-6 w-6 text-indigo-600" />
-                <div>
-                  <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-50">
-                    {extractedData.filename}
-                    {extractedData.saved && <span className="ml-2 text-xs font-semibold text-emerald-500">(Salvo com sucesso no Banco)</span>}
-                  </h3>
-                  <p className="text-sm text-zinc-500">
-                    {extractedData.numpages ? `${extractedData.numpages} páginas extraídas` : "Texto plano"}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={copyToClipboard}
-                  className="flex items-center gap-2 rounded-lg border border-zinc-200 px-4 py-2 text-sm font-medium hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900"
-                >
-                  {copied ? <CheckCircle className="h-4 w-4 text-emerald-500" /> : <Copy className="h-4 w-4" />}
-                  {copied ? "Copiado!" : "Copiar Texto"}
-                </button>
-                <button
-                  onClick={() => {
-                    const blob = new Blob([extractedData.text], { type: "text/plain" });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement("a");
-                    a.href = url;
-                    a.download = `extração-${extractedData.filename}.txt`;
-                    a.click();
-                  }}
-                  className="flex items-center gap-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 dark:bg-zinc-50 dark:text-zinc-900"
-                >
-                  <Download className="h-4 w-4" />
-                  Salvar .txt
-                </button>
-              </div>
-            </div>
-            <div className="rounded-b-2xl border border-zinc-200 bg-zinc-50/50 p-6 dark:border-zinc-800 dark:bg-zinc-900/50">
-              <pre className="max-h-[500px] overflow-y-auto whitespace-pre-wrap text-sm leading-relaxed text-zinc-800 dark:text-zinc-200">
-                {extractedData.text?.trim() 
-                  ? extractedData.text 
-                  : "Nenhum texto extraído. Isso geralmente ocorre se o PDF for uma imagem/documento escaneado sem texto selecionável."}
-              </pre>
-            </div>
-          </div>
-        )}
-      </div>
 
       <div className="rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-black">
         <div className="flex items-center justify-between border-b border-zinc-100 p-6 dark:border-zinc-900">
