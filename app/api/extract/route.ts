@@ -185,8 +185,13 @@ export async function POST(req: NextRequest) {
       }
     };
 
-    // Inicia a extração por trás e segue a vida
-    backgroundTask().catch(console.error);
+    // Inicia a extração por trás e garante que o Vercel espere o término
+    import("@vercel/functions").then(({ waitUntil }) => {
+      waitUntil(backgroundTask());
+    }).catch(() => {
+      // Fallback local se não estiver na Vercel
+      backgroundTask().catch(console.error);
+    });
 
     return NextResponse.json({
       success: true,

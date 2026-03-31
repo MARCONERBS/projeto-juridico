@@ -70,22 +70,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [router]);
 
   const fetchProfile = async (userId: string, email: string) => {
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", userId)
-      .single();
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", userId)
+        .single();
 
-    if (error && error.code === "PGRST116") {
-      // Perfil não existe, vamos criar um perfil fallback 'user' para garantir funcionamento no MVP
-      // O admin oficial precisa tratar esse trigger no banco.
-      const newProfile = { id: userId, email, role: "user" };
-      await (supabase as any).from("profiles").insert([newProfile]);
-      setProfile(newProfile as Profile);
-    } else {
-      setProfile(data ? (data as unknown as Profile) : null);
+      if (error && error.code === "PGRST116") {
+        const newProfile = { id: userId, email, role: "user" };
+        await (supabase as any).from("profiles").insert([newProfile]);
+        setProfile(newProfile as Profile);
+      } else {
+        setProfile(data ? (data as unknown as Profile) : null);
+      }
+    } catch (err) {
+      console.error("Erro ao carregar perfil:", err);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const logout = async () => {
