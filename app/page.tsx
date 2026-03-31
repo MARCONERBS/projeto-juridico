@@ -15,20 +15,12 @@ import { StatsCard } from "@/components/stats-card";
 import { UploadZone } from "@/components/upload-zone";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/components/auth-provider";
-import { useRouter } from "next/navigation";
 
 export default function Home() {
-  const { profile, loading } = useAuth();
-  const router = useRouter();
+  const { profile } = useAuth();
   const [extractedData, setExtractedData] = useState<any>(null);
   const [copied, setCopied] = useState(false);
   const [history, setHistory] = useState<any[]>([]);
-
-  useEffect(() => {
-    if (!loading && profile?.role === "user") {
-      router.replace("/upload");
-    }
-  }, [profile, loading, router]);
 
   useEffect(() => {
     async function loadDashboard() {

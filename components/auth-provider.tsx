@@ -135,15 +135,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await supabase.auth.signOut();
   };
 
-  // Bloqueio de rotas se não estiver logado
+  // Rotas exclusivas de admin
+  const adminOnlyRoutes = ["/", "/team", "/settings"];
+
+  // Bloqueio de rotas por autenticação e role
   useEffect(() => {
-    if (!loading && !user && pathname !== "/login") {
+    if (loading) return;
+
+    // Não logado → vai para login
+    if (!user && pathname !== "/login") {
       router.replace("/login");
+      return;
     }
-    if (!loading && user && pathname === "/login") {
-      router.replace("/");
+
+    // Logado + na tela de login → redireciona por role
+    if (user && profile && pathname === "/login") {
+      if (profile.role === "admin") {
+        router.replace("/");
+      } else {
+        router.replace("/upload");
+      }
+      return;
     }
-  }, [user, loading, pathname, router]);
+
+    // Usuário comum tentando acessar rota de admin
+    if (user && profile && profile.role !== "admin" && adminOnlyRoutes.includes(pathname)) {
+      router.replace("/upload");
+      return;
+    }
+  }, [user, profile, loading, pathname, router]);
 
   // Enquanto carrega a primeira vez, não renderizar o APP se for rota privada
   if (loading && pathname !== "/login") {
