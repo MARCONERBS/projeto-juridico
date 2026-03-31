@@ -91,28 +91,7 @@ export default function LoginPage() {
           padding: 0 3.5rem;
         }
 
-        .divider {
-          width: 44px; height: 3px;
-          background: linear-gradient(90deg,#22c55e,#4ade80);
-          border-radius: 999px;
-        }
 
-        .left-title {
-          font-size: 2.1rem;
-          font-weight: 700;
-          line-height: 1.22;
-          color: #f0fdf4;
-          letter-spacing: -.025em;
-        }
-        .left-sub {
-          font-size: .95rem;
-          color: #86efac;
-          line-height: 1.75;
-        }
-
-        .feats { display:flex; flex-direction:column; gap:.65rem; }
-        .feat  { display:flex; align-items:center; gap:.75rem; font-size:.875rem; color:#bbf7d0; }
-        .dot   { width:8px;height:8px;border-radius:50%;background:#22c55e;box-shadow:0 0 8px #22c55e;flex-shrink:0; }
 
         .left-foot {
           position: absolute;
@@ -242,17 +221,7 @@ export default function LoginPage() {
         {/* ── LEFT ── */}
         <div className="left">
           <div className="left-inner">
-            <Image src="/logo.png" alt="Logo" width={240} height={70} priority style={{objectFit:"contain"}} />
-            <div className="divider" />
-            <h1 className="left-title">Sistema Inteligente de<br />Extração Jurídica</h1>
-            <p className="left-sub">
-              Processe documentos PDF com IA, extraia metadados com precisão e gerencie todo o fluxo jurídico em um único lugar.
-            </p>
-            <div className="feats">
-              {["Extração automática com IA","Gestão de documentos","Acesso multiusuário","Integração com N8N"].map(f=>(
-                <div key={f} className="feat"><div className="dot"/><span>{f}</span></div>
-              ))}
-            </div>
+            <Image src="/logo.png" alt="Logo" width={280} height={80} priority style={{objectFit:"contain"}} />
           </div>
           <p className="left-foot">© 2025 · Todos os direitos reservados</p>
         </div>
