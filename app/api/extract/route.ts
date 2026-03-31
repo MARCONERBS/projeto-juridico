@@ -42,9 +42,11 @@ export async function POST(req: NextRequest) {
         let pageCount = null;
 
         if (fileType === "application/pdf" || fileName.endsWith(".pdf")) {
+          // @ts-ignore
           const workerModule = await import("pdfjs-dist/legacy/build/pdf.worker.mjs");
           (globalThis as any).pdfjsWorker = workerModule;
 
+          // @ts-ignore
           const pdfjsLib = await import("pdfjs-dist/legacy/build/pdf.mjs");
 
           const loadingTask = pdfjsLib.getDocument({
