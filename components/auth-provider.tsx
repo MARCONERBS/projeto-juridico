@@ -29,6 +29,9 @@ const AuthContext = createContext<AuthContextType>({
 
 export const useAuth = () => useContext(AuthContext);
 
+// Rotas exclusivas de admin - usuários comuns serão redirecionados
+const ADMIN_ONLY_ROUTES = ["/", "/team", "/settings"];
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -37,63 +40,107 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
 
-  // Evita setar estado após desmonte
   const isMounted = useRef(true);
-  const hasResolved = useRef(false);
+  const isInitialized = useRef(false);
 
-  const resolveLoading = () => {
-    if (!hasResolved.current && isMounted.current) {
-      hasResolved.current = true;
-      setLoading(false);
+  // Função central de redirecionamento por role
+  const redirectByRole = (role: "admin" | "user", currentPath: string) => {
+    if (role === "admin") {
+      // Admin: só redireciona se estiver no login
+      if (currentPath === "/login") {
+        router.replace("/");
+      }
+    } else {
+      // Usuário comum: redireciona do login e de rotas de admin
+      if (currentPath === "/login" || ADMIN_ONLY_ROUTES.includes(currentPath)) {
+        router.replace("/upload");
+      }
+    }
+  };
+
+  const fetchProfile = async (userId: string, email: string, currentPath: string) => {
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", userId)
+        .single();
+
+      if (!isMounted.current) return;
+
+      let resolvedProfile: Profile;
+
+      if (error && error.code === "PGRST116") {
+        // Novo usuário — cria com role "user"
+        const newProfile = { id: userId, email, role: "user" as const };
+        await supabase.from("profiles").insert([newProfile]);
+        resolvedProfile = newProfile;
+      } else {
+        resolvedProfile = data as Profile;
+      }
+
+      if (!isMounted.current) return;
+
+      setProfile(resolvedProfile);
+
+      // Agora que temos o profile, redirecionamos com base no role
+      redirectByRole(resolvedProfile.role, currentPath);
+    } catch (err) {
+      console.error("Erro ao carregar perfil:", err);
+    } finally {
+      if (isMounted.current) {
+        setLoading(false);
+      }
     }
   };
 
   useEffect(() => {
     isMounted.current = true;
-    hasResolved.current = false;
+    isInitialized.current = false;
 
-    // Fallback: se em 5 segundos nada resolver, libera a tela
+    // Fallback de segurança: 6s para liberar a tela
     const fallbackTimer = setTimeout(() => {
-      if (isMounted.current && !hasResolved.current) {
-        console.warn("Auth: timeout de fallback acionado.");
-        resolveLoading();
+      if (isMounted.current) {
+        console.warn("Auth: fallback de 6s acionado");
+        setLoading(false);
       }
-    }, 5000);
+    }, 6000);
 
-    // Busca a sessão inicial
-    supabase.auth
-      .getSession()
-      .then(({ data: { session } }: { data: { session: Session | null } }) => {
+    // Inicializa sessão existente (refresh de página)
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!isMounted.current) return;
+      isInitialized.current = true;
+      setSessionData(session);
+      setUser(session?.user ?? null);
+
+      if (session?.user) {
+        fetchProfile(session.user.id, session.user.email!, pathname);
+      } else {
+        setLoading(false);
+      }
+    }).catch(() => {
+      if (isMounted.current) setLoading(false);
+    });
+
+    // Escuta eventos de auth (login/logout)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
         if (!isMounted.current) return;
+
+        // Evita duplicata com getSession no primeiro carregamento
+        if (event === "INITIAL_SESSION") return;
+
         setSessionData(session);
         setUser(session?.user ?? null);
-        if (session?.user) {
-          fetchProfile(session.user.id, session.user.email!);
-        } else {
-          resolveLoading();
-        }
-      })
-      .catch((err) => {
-        console.error("Auth: erro ao buscar sessão:", err);
-        resolveLoading();
-      });
 
-    // Escuta mudanças de auth
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(
-      async (event: string, session: Session | null) => {
-        if (!isMounted.current) return;
-        setSessionData(session);
-        setUser(session?.user ?? null);
         if (session?.user) {
-          await fetchProfile(session.user.id, session.user.email!);
+          // Obtemos pathname atual via ref para não fechar sobre valor antigo
+          const currentPath = window.location.pathname;
+          await fetchProfile(session.user.id, session.user.email!, currentPath);
         } else {
           setProfile(null);
-          resolveLoading();
-          if (pathname !== "/login") {
-            router.push("/login");
-          }
+          setLoading(false);
+          router.push("/login");
         }
       }
     );
@@ -106,66 +153,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const fetchProfile = async (userId: string, email: string) => {
-    try {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", userId)
-        .single();
-
-      if (!isMounted.current) return;
-
-      if (error && error.code === "PGRST116") {
-        const newProfile = { id: userId, email, role: "user" };
-        await (supabase as any).from("profiles").insert([newProfile]);
-        if (isMounted.current) setProfile(newProfile as Profile);
-      } else {
-        if (isMounted.current)
-          setProfile(data ? (data as unknown as Profile) : null);
-      }
-    } catch (err) {
-      console.error("Erro ao carregar perfil:", err);
-    } finally {
-      resolveLoading();
-    }
-  };
-
-  const logout = async () => {
-    await supabase.auth.signOut();
-  };
-
-  // Rotas exclusivas de admin
-  const adminOnlyRoutes = ["/", "/team", "/settings"];
-
-  // Bloqueio de rotas por autenticação e role
+  // Guarda de rotas: protege rotas de admin de usuários comuns
   useEffect(() => {
-    if (loading) return;
+    if (loading || !user || !profile) return;
 
-    // Não logado → vai para login
+    if (profile.role !== "admin" && ADMIN_ONLY_ROUTES.includes(pathname)) {
+      router.replace("/upload");
+    }
+
     if (!user && pathname !== "/login") {
       router.replace("/login");
-      return;
     }
+  }, [loading, user, profile, pathname, router]);
 
-    // Logado + na tela de login → redireciona por role
-    if (user && profile && pathname === "/login") {
-      if (profile.role === "admin") {
-        router.replace("/");
-      } else {
-        router.replace("/upload");
-      }
-      return;
-    }
-
-    // Usuário comum tentando acessar rota de admin
-    if (user && profile && profile.role !== "admin" && adminOnlyRoutes.includes(pathname)) {
-      router.replace("/upload");
-      return;
-    }
-  }, [user, profile, loading, pathname, router]);
-
-  // Enquanto carrega a primeira vez, não renderizar o APP se for rota privada
+  // Tela de carregamento (apenas em rotas privadas)
   if (loading && pathname !== "/login") {
     return (
       <div className="flex h-screen items-center justify-center bg-black">
@@ -175,9 +176,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider
-      value={{ user, profile, session: sessionData, loading, logout }}
-    >
+    <AuthContext.Provider value={{ user, profile, session: sessionData, loading, logout: async () => { await supabase.auth.signOut(); } }}>
       {children}
     </AuthContext.Provider>
   );
