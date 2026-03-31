@@ -1,0 +1,4 @@
+Este é um arquivo de teste para a plataforma de extração.
+O sistema deve ser capaz de ler este conteúdo e exibi-lo no painel.
+A extração de texto é o foco principal agora.
+Assinado: Antigravity AI.

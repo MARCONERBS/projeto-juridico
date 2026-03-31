@@ -1,0 +1,185 @@
+"use client";
+
+import { useState, useRef } from "react";
+import { Upload, FileText, CheckCircle2, AlertCircle, Loader2, X } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { useAuth } from "@/components/auth-provider";
+
+interface UploadZoneProps {
+  onExtractionComplete: (data: any) => void;
+}
+
+export function UploadZone({ onExtractionComplete }: UploadZoneProps) {
+  const { user } = useAuth();
+  const [isDragging, setIsDragging] = useState(false);
+  const [file, setFile] = useState<File | null>(null);
+  const [status, setStatus] = useState<"idle" | "uploading" | "success" | "error">("idle");
+  const [error, setError] = useState<string>("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = () => {
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const droppedFile = e.dataTransfer.files[0];
+    if (droppedFile) validateAndUpload(droppedFile);
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0];
+    if (selectedFile) validateAndUpload(selectedFile);
+  };
+
+  const validateAndUpload = async (file: File) => {
+    setFile(file);
+    setStatus("uploading");
+    setError("");
+
+    const formData = new FormData();
+    formData.append("file", file);
+    if (user) {
+      formData.append("userId", user.id);
+      if (user.email) formData.append("userEmail", user.email);
+    }
+    
+    const token = localStorage.getItem("gemini_api_key");
+    if (token) {
+      formData.append("geminiApiKey", token);
+    }
+    
+    const webhook = localStorage.getItem("n8n_webhook_send");
+    if (webhook) {
+      formData.append("n8nWebhook", webhook);
+    }
+
+    try {
+      const response = await fetch("/api/extract", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error("Falha na extração");
+      }
+
+      const data = await response.json();
+      setStatus("success");
+      onExtractionComplete(data);
+    } catch (err: any) {
+      setStatus("error");
+      setError(err.message || "Erro ao processar arquivo");
+    }
+  };
+
+  const reset = () => {
+    setFile(null);
+    setStatus("idle");
+    setError("");
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  return (
+    <div className="w-full space-y-4">
+      <div
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        className={cn(
+          "relative flex min-h-[250px] cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed transition-all duration-200",
+          isDragging
+            ? "border-indigo-500 bg-indigo-50/50 dark:bg-indigo-900/10"
+            : "border-zinc-200 bg-white hover:border-zinc-300 dark:border-zinc-800 dark:bg-black dark:hover:border-zinc-700",
+          status === "uploading" && "pointer-events-none opacity-80"
+        )}
+        onClick={() => fileInputRef.current?.click()}
+      >
+        <input
+          type="file"
+          className="hidden"
+          ref={fileInputRef}
+          onChange={handleFileSelect}
+          accept=".pdf,.txt"
+        />
+
+        {status === "idle" && (
+          <div className="flex flex-col items-center gap-3 p-8 text-center">
+            <div className="rounded-full bg-zinc-100 p-4 dark:bg-zinc-900">
+              <Upload className="h-8 w-8 text-zinc-500" />
+            </div>
+            <div>
+              <p className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+                Arraste um PDF ou arquivo de texto
+              </p>
+              <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                Ou clique para selecionar manualmente (Max 10MB)
+              </p>
+            </div>
+          </div>
+        )}
+
+        {status === "uploading" && (
+          <div className="flex flex-col items-center gap-4 p-8">
+            <Loader2 className="h-10 w-10 animate-spin text-indigo-600" />
+            <p className="text-lg font-medium text-zinc-900 dark:text-zinc-50">
+              Extraindo texto de {file?.name}...
+            </p>
+          </div>
+        )}
+
+        {status === "success" && (
+          <div className="flex flex-col items-center gap-4 p-8 text-center">
+            <CheckCircle2 className="h-12 w-12 text-emerald-500" />
+            <div>
+              <p className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+                Extração concluída!
+              </p>
+              <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                O conteúdo de {file?.name} já está disponível abaixo.
+              </p>
+            </div>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                reset();
+              }}
+              className="mt-2 rounded-full border border-zinc-200 px-6 py-2 text-sm font-medium hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900"
+            >
+              Extrair outro arquivo
+            </button>
+          </div>
+        )}
+
+        {status === "error" && (
+          <div className="flex flex-col items-center gap-4 p-8 text-center">
+            <AlertCircle className="h-12 w-12 text-rose-500" />
+            <div>
+              <p className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+                Ocorreu um erro
+              </p>
+              <p className="text-sm text-rose-500">
+                {error}
+              </p>
+            </div>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                reset();
+              }}
+              className="mt-2 rounded-full bg-zinc-900 px-6 py-2 text-sm font-medium text-white hover:bg-zinc-800 dark:bg-zinc-50 dark:text-zinc-900"
+            >
+              Tentar novamente
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
