@@ -31,16 +31,6 @@ export const useAuth = () => useContext(AuthContext);
 
 const ADMIN_ONLY_ROUTES = ["/", "/team", "/settings"];
 
-/**
- * Obtém o role do usuário a partir do JWT (app_metadata).
- * Essa abordagem é imediata (sem DB call) e funciona no refresh.
- * Fallback para "user" se o campo não estiver presente.
- */
-function getRoleFromSession(session: Session): "admin" | "user" {
-  const role = session.user?.app_metadata?.role;
-  return role === "admin" ? "admin" : "user";
-}
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -53,33 +43,71 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     isMounted.current = true;
 
-    // Fallback de segurança: 6s
+    // Fallback de segurança: 10s
     const fallback = setTimeout(() => {
       if (isMounted.current) {
         console.warn("Auth: fallback acionado");
         setLoading(false);
       }
-    }, 6000);
+    }, 10000);
+
+    const resolveProfile = async (session: Session) => {
+      // 1. Tenta ler o role do JWT app_metadata (imediato, sem DB call)
+      const jwtRole = session.user?.app_metadata?.role as "admin" | "user" | undefined;
+
+      if (jwtRole) {
+        // Caminho rápido: role disponível no token
+        if (isMounted.current) {
+          setProfile({ id: session.user.id, email: session.user.email ?? "", role: jwtRole });
+          setLoading(false);
+        }
+        return jwtRole;
+      }
+
+      // 2. Fallback: busca na tabela profiles (tokens antigos sem role no JWT)
+      try {
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("id, email, role")
+          .eq("id", session.user.id)
+          .single();
+
+        if (!isMounted.current) return "user";
+
+        if (data?.role) {
+          setProfile(data as Profile);
+          setLoading(false);
+          return data.role as "admin" | "user";
+        }
+
+        // Profile não encontrado: cria como user
+        const newProfile: Profile = { id: session.user.id, email: session.user.email ?? "", role: "user" };
+        await supabase.from("profiles").insert([newProfile]).select().single();
+        if (isMounted.current) {
+          setProfile(newProfile);
+          setLoading(false);
+        }
+        return "user";
+      } catch {
+        if (isMounted.current) {
+          setProfile({ id: session.user.id, email: session.user.email ?? "", role: "user" });
+          setLoading(false);
+        }
+        return "user";
+      }
+    };
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
+      async (event, session) => {
         if (!isMounted.current) return;
 
         setSessionData(session);
         setUser(session?.user ?? null);
 
         if (session?.user) {
-          // Lê o role DIRETAMENTE do JWT - sem DB call, sem race condition
-          const role = getRoleFromSession(session);
-          const currentProfile: Profile = {
-            id: session.user.id,
-            email: session.user.email ?? "",
-            role,
-          };
-          setProfile(currentProfile);
-          setLoading(false);
+          const role = await resolveProfile(session);
 
-          // Redireciona apenas no evento de login (não no refresh)
+          // Redireciona apenas ao fazer login (não no refresh)
           if (event === "SIGNED_IN") {
             const currentPath = window.location.pathname;
             if (currentPath === "/login") {
@@ -87,11 +115,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }
           }
         } else {
-          // Sem sessão
           setProfile(null);
           setLoading(false);
-
-          // Redireciona para login apenas em eventos explícitos (não INITIAL_SESSION com null)
           if (event === "SIGNED_OUT") {
             router.push("/login");
           }
@@ -111,32 +136,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (loading) return;
 
-    // Não logado em rota privada → login
     if (!user && pathname !== "/login") {
       router.replace("/login");
       return;
     }
 
-    // Admin em /login → painel admin
     if (user && profile?.role === "admin" && pathname === "/login") {
       router.replace("/");
       return;
     }
 
-    // Usuário comum em /login → /upload
     if (user && profile?.role === "user" && pathname === "/login") {
       router.replace("/upload");
       return;
     }
 
-    // Usuário comum em rota de admin → /upload
     if (user && profile?.role !== "admin" && ADMIN_ONLY_ROUTES.includes(pathname)) {
       router.replace("/upload");
       return;
     }
   }, [loading, user, profile, pathname, router]);
 
-  // Tela de carregamento
   if (loading && pathname !== "/login") {
     return (
       <div className="flex h-screen items-center justify-center bg-black">
