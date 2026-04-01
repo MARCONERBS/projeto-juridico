@@ -157,9 +157,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [loading, user, profile, pathname, router]);
 
-  // Bloqueia a renderização do conteúdo (DashboardShell + Páginas) 
-  // enquanto não tivermos certeza do estado da sessão
-  if (loading || (!user && pathname !== "/login")) {
+  // 1. Se estiver carregando, mostra tela de bloqueio
+  if (loading) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-black">
+        <div className="flex flex-col items-center gap-4">
+           <span className="text-emerald-500 animate-pulse text-lg font-bold tracking-widest">
+             CORE
+           </span>
+           <span className="text-zinc-500 text-xs animate-pulse">
+             Iniciando sistema...
+           </span>
+        </div>
+      </div>
+    );
+  }
+
+  // 2. Se não estiver logado e não estiver na página de login, bloqueia e redireciona
+  if (!user && pathname !== "/login") {
     return (
       <div className="flex h-screen items-center justify-center bg-black">
         <div className="flex flex-col items-center gap-4">
@@ -168,6 +183,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
            </span>
            <span className="text-zinc-500 text-xs animate-pulse">
              Verificando acesso...
+           </span>
+        </div>
+      </div>
+    );
+  }
+
+  // 3. Se estiver logado mas o perfil ainda não subiu, bloqueia para evitar flash de conteúdo errado
+  if (user && !profile && pathname !== "/login") {
+    return (
+      <div className="flex h-screen items-center justify-center bg-black">
+        <div className="flex flex-col items-center gap-4">
+           <span className="text-emerald-500 animate-pulse text-lg font-bold tracking-widest">
+             CORE
+           </span>
+           <span className="text-zinc-500 text-xs animate-pulse">
+             Carregando perfil...
            </span>
         </div>
       </div>
