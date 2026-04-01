@@ -1,7 +1,7 @@
 {
-  "name": "CORE - Extrações Jurídicas",
-  "short_name": "CORE",
-  "description": "Sistema de extração de dados jurídicos com IA",
+  "name": "Arcofoods",
+  "short_name": "Arcofoods",
+  "description": "Arcofoods",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

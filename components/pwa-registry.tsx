@@ -121,7 +121,7 @@ export function PwaRegistry() {
             <img src="/icon-192.png" alt="App icon" />
           </div>
           <div className="pwa-text">
-            <h4>Instalar CORE</h4>
+            <h4>Instalar Arcofoods</h4>
             <p>Adicione à tela inicial para acesso rápido</p>
           </div>
         </div>

@@ -24,12 +24,12 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "CORE",
-  description: "Sistema inteligente para prospecção e gestão de extrações.",
+  title: "Arcofoods",
+  description: "Arcofoods",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
-    title: "CORE",
+    title: "Arcofoods",
     statusBarStyle: "black-translucent",
   },
   icons: {
