@@ -115,14 +115,14 @@ export default function HistoryPage() {
                   <span className="text-[10px] text-zinc-400 uppercase font-medium block">Emissão</span>
                   <div className="flex items-center gap-1.5 text-xs text-zinc-700 dark:text-zinc-300">
                     <Calendar className="h-3 w-3 opacity-50" />
-                    {item.data_json?.data_emissao || "--"}
+                    {item.data_json?.data_emissao || item.data_json?.emissao || item.data_json?.data_emissão || "--"}
                   </div>
                 </div>
                 <div className="space-y-1">
                   <span className="text-[10px] text-zinc-400 uppercase font-medium block">Vencimento</span>
                   <div className={`flex items-center gap-1.5 text-xs font-medium ${item.data_json?.data_vencimento ? 'text-amber-600' : 'text-zinc-500'}`}>
                     <Zap className={`h-3 w-3 ${item.data_json?.data_vencimento ? 'opacity-100' : 'opacity-50'}`} />
-                    {item.data_json?.data_vencimento || "--"}
+                    {item.data_json?.data_vencimento || item.data_json?.data_validade || item.data_json?.validade || item.data_json?.vencimento || "--"}
                   </div>
                 </div>
                 <div className="space-y-1">
@@ -234,13 +234,13 @@ export default function HistoryPage() {
                     <td className="whitespace-nowrap px-6 py-4 text-sm text-zinc-600 dark:text-zinc-400">
                       <div className="flex items-center gap-1.5">
                          <Calendar className="h-3.5 w-3.5 opacity-50" />
-                         {item.data_json?.data_emissao ? item.data_json.data_emissao : <span className="text-zinc-400 italic">--</span>}
+                         {item.data_json?.data_emissao || item.data_json?.emissao || item.data_json?.data_emissão ? (item.data_json.data_emissao || item.data_json.emissao || item.data_json.data_emissão) : <span className="text-zinc-400 italic">--</span>}
                       </div>
                     </td>
                     <td className="whitespace-nowrap px-6 py-4 text-sm text-zinc-600 dark:text-zinc-400">
                       <div className="flex items-center gap-1.5">
                          <Zap className={`h-3.5 w-3.5 ${item.data_json?.data_vencimento ? 'text-amber-500' : 'opacity-30'}`} />
-                         {item.data_json?.data_vencimento ? item.data_json.data_vencimento : <span className="text-zinc-400 italic">--</span>}
+                         {item.data_json?.data_vencimento || item.data_json?.data_validade || item.data_json?.vencimento || item.data_json?.validade ? (item.data_json.data_vencimento || item.data_json.data_validade || item.data_json.vencimento || item.data_json.validade) : <span className="text-zinc-400 italic">--</span>}
                       </div>
                     </td>
                     <td className="whitespace-nowrap px-6 py-4 text-sm text-zinc-600 dark:text-zinc-400">

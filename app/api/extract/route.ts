@@ -115,20 +115,31 @@ export async function POST(req: NextRequest) {
           try {
             const genAI = new GoogleGenerativeAI(geminiKey);
             const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-            const result = await model.generateContent(`Analise detalhadamente o texto do documento a seguir e encontre as exatas Data de Emissão e Data de Vencimento.\nResponda ESTRITAMENTE em formato JSON usando as chaves "data_emissao" e "data_vencimento".\nFormato exato de data: "DD/MM/YYYY".\nTexto:\n${extractedText.substring(0, 25000)}`);
+            const result = await model.generateContent(`Analise detalhadamente o texto do documento a seguir e encontre as exatas Data de Emissão e Data de Vencimento/Validade.\nResponda ESTRITAMENTE em formato JSON usando as chaves "data_emissao" e "data_vencimento".\nFormato exato de data: "DD/MM/YYYY".\nImportante: Se o documento usar o termo "Data de validade", use esse valor para "data_vencimento".\nTexto:\n${extractedText.substring(0, 25000)}`);
             let rawJson = result.response.text();
             
-            if (rawJson.includes("\`\`\`")) {
-              rawJson = rawJson.replace(/(((^```(json)?\\s*))|(\\s*```$))/gm, "").trim();
-              rawJson = rawJson.replace(/^```json/, '').replace(/```$/, '').trim();
+            // Extração robusta de JSON (pega tudo que estiver entre { e })
+            const jsonMatch = rawJson.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+              rawJson = jsonMatch[0];
+              const parsedData = JSON.parse(rawJson);
+              // Mapeamento flexível de chaves
+              dataEmissao = parsedData.data_emissao || parsedData.emissao || parsedData.data_emissão || null;
+              dataVencimento = parsedData.data_vencimento || parsedData.data_validade || parsedData.validade || parsedData.vencimento || null;
             }
-
-            const parsedData = JSON.parse(rawJson);
-            dataEmissao = parsedData.data_emissao || null;
-            dataVencimento = parsedData.data_vencimento || null;
           } catch (metaErr) {
              console.warn("Aviso: Falha ao extrair metadados com IA: ", metaErr);
           }
+        }
+
+        // FALLBACK DE SEGURANÇA: Se a IA falhou, tenta extração direta por texto (RegEx)
+        if (!dataEmissao && extractedText) {
+          const matchEmissao = extractedText.match(/(?:emissão|emissao):\s*(\d{2}\/\d{2}\/\d{4})/i);
+          if (matchEmissao) dataEmissao = matchEmissao[1];
+        }
+        if (!dataVencimento && extractedText) {
+          const matchVencimento = extractedText.match(/(?:validade|vencimento|venc):\s*(\d{2}\/\d{2}\/\d{4})/i);
+          if (matchVencimento) dataVencimento = matchVencimento[1];
         }
 
         let publicFileUrl = null;
