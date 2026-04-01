@@ -1,4 +1,4 @@
-const CACHE_NAME = "core-pwa-v1";
+const CACHE_NAME = "core-pwa-v2"; // Incrementada para forçar reset do cache
 const STATIC_ASSETS = ["/", "/manifest.json", "/icon-192.png", "/icon-512.png"];
 
 self.addEventListener("install", (e) => {
@@ -20,21 +20,40 @@ self.addEventListener("activate", (e) => {
 });
 
 self.addEventListener("fetch", (e) => {
-  // Ignora requisições de API e autenticação — sempre busca da rede
+  const url = new URL(e.request.url);
+
+  // 1. Ignora APIs, Supabase e não-GET
   if (
-    e.request.url.includes("/api/") ||
-    e.request.url.includes("supabase.co") ||
+    url.pathname.includes("/api/") ||
+    url.hostname.includes("supabase.co") ||
     e.request.method !== "GET"
   ) {
     return e.respondWith(fetch(e.request));
   }
 
-  // Para assets estáticos: cache first
+  // 2. Estratégia Network-First para a Navegação (Páginas HTML e ROOT)
+  // Isso evita que o navegador mostre o Painel de Administrador cacheado se o usuário não estiver logado.
+  if (e.request.mode === "navigate" || url.pathname === "/") {
+    return e.respondWith(
+      fetch(e.request)
+        .then((response) => {
+          // Atualiza o cache com a versão mais recente da rede
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(e.request, clone));
+          return response;
+        })
+        .catch(() => {
+          // Se estiver offline, tenta o cache
+          return caches.match(e.request);
+        })
+    );
+  }
+
+  // 3. Estratégia Cache-First para demais Assets (Imagens, Ícones, etc)
   e.respondWith(
     caches.match(e.request).then((cached) => {
       return cached || fetch(e.request).then((response) => {
-        // Salva novos recursos estáticos no cache
-        if (response.ok && e.request.url.startsWith(self.location.origin)) {
+        if (response.ok && url.origin === self.location.origin) {
           const clone = response.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(e.request, clone));
         }
